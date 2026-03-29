@@ -9,7 +9,6 @@ import asyncio
 import tempfile
 import os
 import edge_tts
-import pygame
 
 # Har bir til uchun ovoz
 VOICE_MAP = {
@@ -31,10 +30,19 @@ VOICE_MAP = {
 
 class TextToSpeech:
     def __init__(self):
-        pygame.mixer.init()
+        # pygame faqat lokal uchun (server uchun kerak emas)
+        self._pygame = None
+        try:
+            import pygame
+            pygame.mixer.init()
+            self._pygame = pygame
+        except ImportError:
+            pass
 
     def speak(self, text: str, lang_code: str = "uz"):
-        """Matnni toza ovozda aytadi."""
+        """Matnni toza ovozda aytadi (faqat lokal)."""
+        if not self._pygame:
+            return
         voice = VOICE_MAP.get(lang_code, "uz-UZ-SardorNeural")
         asyncio.run(self._speak_async(text, voice))
 
@@ -47,12 +55,12 @@ class TextToSpeech:
             tts = edge_tts.Communicate(text, voice)
             await tts.save(temp_path)
 
-            pygame.mixer.music.load(temp_path)
-            pygame.mixer.music.play()
-            while pygame.mixer.music.get_busy():
-                pygame.time.wait(100)
+            self._pygame.mixer.music.load(temp_path)
+            self._pygame.mixer.music.play()
+            while self._pygame.mixer.music.get_busy():
+                self._pygame.time.wait(100)
         finally:
-            pygame.mixer.music.unload()
+            self._pygame.mixer.music.unload()
             os.remove(temp_path)
 
     def speak_to_file(self, text: str, lang_code: str = "uz") -> bytes:
