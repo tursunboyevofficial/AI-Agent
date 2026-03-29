@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Martis — O'zbek AI Agent</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            min-height: 100vh; color: #fff;
+        }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+
+        .header { text-align: center; padding: 25px 0 10px; }
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d2ff, #3a7bd5, #8b5cf6);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .header p { color: #8892b0; font-size: 0.95rem; margin-top: 5px; }
+
+        /* === MARTIS ACTIVATION === */
+        .martis-zone {
+            text-align: center; padding: 20px 0;
+        }
+        .martis-orb {
+            width: 120px; height: 120px; border-radius: 50%; margin: 0 auto 15px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2.5rem; cursor: pointer; transition: all 0.3s;
+            border: 3px solid #333; background: rgba(255,255,255,0.03);
+        }
+        .martis-orb.idle { border-color: #3a7bd5; }
+        .martis-orb.idle:hover { box-shadow: 0 0 30px rgba(58,123,213,0.3); }
+        .martis-orb.waiting {
+            border-color: #10b981; background: rgba(16,185,129,0.1);
+            animation: orbPulse 2s infinite;
+        }
+        .martis-orb.heard {
+            border-color: #f59e0b; background: rgba(245,158,11,0.15);
+            animation: orbGlow 0.5s;
+        }
+        .martis-orb.listening {
+            border-color: #ef4444; background: rgba(239,68,68,0.15);
+            animation: orbRecord 1s infinite;
+        }
+        .martis-orb.thinking {
+            border-color: #8b5cf6; background: rgba(139,92,246,0.15);
+            animation: orbSpin 1s infinite linear;
+        }
+        .martis-orb.speaking {
+            border-color: #00d2ff; background: rgba(0,210,255,0.15);
+            animation: orbSpeak 0.6s infinite;
+        }
+
+        @keyframes orbPulse {
+            0%,100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.4); }
+            50% { box-shadow: 0 0 0 15px rgba(16,185,129,0); }
+        }
+        @keyframes orbGlow {
+            0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); }
+        }
+        @keyframes orbRecord {
+            0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
+            50% { box-shadow: 0 0 0 12px rgba(239,68,68,0); }
+        }
+        @keyframes orbSpin {
+            0% { box-shadow: 0 0 20px rgba(139,92,246,0.5); }
+            50% { box-shadow: 0 0 40px rgba(139,92,246,0.2); }
+            100% { box-shadow: 0 0 20px rgba(139,92,246,0.5); }
+        }
+        @keyframes orbSpeak {
+            0%,100% { transform: scale(1); } 50% { transform: scale(1.05); }
+        }
+
+        .martis-status {
+            font-size: 1rem; color: #8892b0; margin-bottom: 5px;
+        }
+        .martis-status.active { color: #10b981; }
+        .martis-status.heard { color: #f59e0b; }
+        .martis-status.listening { color: #ef4444; }
+        .martis-status.thinking { color: #8b5cf6; }
+        .martis-status.speaking { color: #00d2ff; }
+
+        .martis-text {
+            font-size: 0.85rem; color: #4a5568; min-height: 20px;
+        }
+
+        /* === CHAT LOG === */
+        .chat-log {
+            background: rgba(255,255,255,0.03); border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.1); margin-top: 20px;
+            max-height: 350px; overflow-y: auto; padding: 15px;
+        }
+        .chat-log::-webkit-scrollbar { width: 6px; }
+        .chat-log::-webkit-scrollbar-thumb { background: #3a7bd5; border-radius: 3px; }
+
+        .log-item {
+            padding: 10px 14px; margin-bottom: 8px; border-radius: 12px;
+            font-size: 0.9rem; line-height: 1.5; animation: fadeIn 0.3s;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; } }
+
+        .log-item.user {
+            background: linear-gradient(135deg, #3a7bd5, #00d2ff);
+            color: #fff; margin-left: 20%;
+        }
+        .log-item.bot {
+            background: rgba(255,255,255,0.08); color: #ccd6f6;
+            margin-right: 20%;
+        }
+        .log-item.system {
+            background: rgba(139,92,246,0.1); color: #a78bfa;
+            text-align: center; font-size: 0.8rem;
+        }
+        .log-item .replay-btn {
+            background: none; border: none; color: #3a7bd5; cursor: pointer;
+            font-size: 0.95rem; margin-left: 6px;
+        }
+
+        /* === MANUAL INPUT === */
+        .manual-bar {
+            display: flex; gap: 8px; margin-top: 15px;
+        }
+        .manual-input {
+            flex: 1; padding: 12px 16px; border-radius: 12px;
+            border: 2px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05);
+            color: #fff; font-size: 0.9rem; outline: none;
+        }
+        .manual-input:focus { border-color: #3a7bd5; }
+        .manual-input::placeholder { color: #4a5568; }
+        .btn {
+            padding: 12px 20px; border-radius: 12px; border: none;
+            font-size: 0.9rem; font-weight: 600; cursor: pointer;
+            transition: all 0.3s; display: inline-flex; align-items: center; gap: 6px;
+        }
+        .btn-green { background: linear-gradient(135deg, #10b981, #34d399); color: #fff; }
+        .btn-secondary { background: rgba(255,255,255,0.08); color: #8892b0; border: 1px solid rgba(255,255,255,0.1); }
+
+        /* === TABS (tarjimon, kino) === */
+        .extra-tabs { margin-top: 30px; }
+        .extra-tabs-header {
+            display: flex; gap: 4px; margin-bottom: 15px;
+            background: rgba(255,255,255,0.05); border-radius: 12px; padding: 4px;
+            max-width: 350px; margin-left: auto; margin-right: auto;
+        }
+        .etab-btn {
+            flex: 1; padding: 10px; border: none; border-radius: 8px;
+            background: transparent; color: #8892b0; font-size: 0.85rem;
+            font-weight: 600; cursor: pointer; transition: all 0.3s;
+        }
+        .etab-btn.active { background: rgba(58,123,213,0.3); color: #fff; }
+        .etab-content { display: none; }
+        .etab-content.active { display: block; }
+
+        /* Tarjimon */
+        .lang-bar { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+        .lang-select {
+            padding: 10px 15px; border-radius: 10px; border: 2px solid #3a7bd5;
+            background: rgba(255,255,255,0.05); color: #fff; font-size: 0.9rem;
+            cursor: pointer; min-width: 150px; outline: none;
+        }
+        .lang-select option { background: #1a1a2e; color: #fff; }
+        .swap-btn {
+            width: 38px; height: 38px; border-radius: 50%; border: 2px solid #3a7bd5;
+            background: rgba(58,123,213,0.15); color: #3a7bd5; font-size: 1.2rem;
+            cursor: pointer; transition: all 0.3s;
+        }
+        .swap-btn:hover { background: #3a7bd5; color: #fff; transform: rotate(180deg); }
+        .translator-box { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+        @media (max-width: 600px) { .translator-box { grid-template-columns: 1fr; } }
+        .panel { background: rgba(255,255,255,0.05); border-radius: 14px; padding: 15px; border: 1px solid rgba(255,255,255,0.1); }
+        .panel-label { font-size: 0.75rem; color: #8892b0; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+        .text-input { width:100%; min-height:100px; background:transparent; border:none; color:#fff; font-size:0.95rem; resize:vertical; outline:none; font-family:inherit; line-height:1.5; }
+        .text-input::placeholder { color: #4a5568; }
+        .result-text { min-height:100px; font-size:0.95rem; line-height:1.5; color:#00d2ff; }
+        .result-text.empty { color: #4a5568; }
+        .actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+        .btn-primary { background: linear-gradient(135deg, #3a7bd5, #00d2ff); color: #fff; }
+        .btn-voice { background: linear-gradient(135deg, #e44d26, #f16529); color: #fff; }
+        .btn-voice.recording { animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(228,77,38,0.5)}50%{box-shadow:0 0 0 10px rgba(228,77,38,0)} }
+        .btn-movie { background: linear-gradient(135deg, #8b5cf6, #a855f7); color: #fff; }
+        .status { text-align:center; margin-top:12px; padding:8px; border-radius:8px; font-size:0.8rem; display:none; }
+        .status.show { display: block; }
+        .status.loading { background:rgba(58,123,213,0.15); color:#3a7bd5; }
+        .status.success { background:rgba(0,210,255,0.1); color:#00d2ff; }
+        .status.error { background:rgba(255,82,82,0.1); color:#ff5252; }
+
+        /* Kino */
+        .search-bar { display: flex; gap: 8px; margin-bottom: 15px; }
+        .search-input { flex:1; padding:12px 15px; border-radius:10px; border:2px solid #3a7bd5; background:rgba(255,255,255,0.05); color:#fff; font-size:0.9rem; outline:none; }
+        .search-input::placeholder { color: #4a5568; }
+        .movie-result { background:rgba(255,255,255,0.05); border-radius:14px; padding:18px; border:1px solid rgba(255,255,255,0.1); margin-bottom:15px; display:none; }
+        .movie-result.show { display: block; }
+        .movie-title { font-size:1.3rem; font-weight:700; background:linear-gradient(90deg,#00d2ff,#3a7bd5); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:10px; }
+        .movie-summary { font-size:0.95rem; line-height:1.7; color:#ccd6f6; margin-bottom:10px; }
+        .movie-link { color:#3a7bd5; text-decoration:none; font-size:0.8rem; }
+        .popular-title { font-size:0.9rem; color:#8892b0; margin-bottom:10px; text-align:center; }
+        .popular-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:6px; }
+        .popular-card { background:rgba(255,255,255,0.05); border-radius:10px; padding:10px; text-align:center; cursor:pointer; border:1px solid rgba(255,255,255,0.08); transition:all 0.3s; }
+        .popular-card:hover { border-color:#3a7bd5; transform:translateY(-2px); }
+        .popular-card .emoji { font-size:1.5rem; margin-bottom:4px; }
+        .popular-card .name { font-size:0.8rem; color:#ccd6f6; font-weight:600; }
+        .popular-card .uz-name { font-size:0.65rem; color:#3a7bd5; margin-top:2px; }
+
+        .footer { text-align:center; margin-top:25px; padding:10px; color:#4a5568; font-size:0.7rem; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Martis</h1>
+        <p>O'zbek tilida ishlaydigan AI Agent</p>
+    </div>
+
+    <!-- === MARTIS MAIN ZONE === -->
+    <div class="martis-zone">
+        <div class="martis-orb idle" id="martisOrb" onclick="activateMartis()">🤖</div>
+        <div class="martis-status" id="martisStatusText">👆 Doirani bosing — keyin "Martis" deb ayting</div>
+        <div class="martis-text" id="martisSubText"></div>
+    </div>
+
+    <!-- Chat Log -->
+    <div class="chat-log" id="chatLog">
+        <div class="log-item system">1. Yuqoridagi 🤖 doirani bosing<br>2. Yashil bo'lganda "Martis" deb ayting<br>3. Chrome brauzer kerak!</div>
+    </div>
+
+    <!-- Manual Input -->
+    <div class="manual-bar">
+        <input type="text" id="manualInput" class="manual-input" placeholder="Yoki shu yerga yozing..."
+            onkeydown="if(event.key==='Enter')manualSend()">
+        <button class="btn btn-green" onclick="manualSend()">➤</button>
+        <button class="btn btn-secondary" onclick="resetChat()">🗑</button>
+    </div>
+
+    <!-- === EXTRA TABS === -->
+    <div class="extra-tabs">
+        <div class="extra-tabs-header">
+            <button class="etab-btn active" onclick="switchExtraTab('translator',this)">🌐 Tarjimon</button>
+            <button class="etab-btn" onclick="switchExtraTab('movies',this)">🎬 Kino</button>
+        </div>
+
+        <div id="etab-translator" class="etab-content active">
+            <div class="lang-bar">
+                <select id="sourceLang" class="lang-select">
+                    {% for code, (name, speech, tts) in languages.items() %}
+                    <option value="{{ code }}" {% if code == 'uz' %}selected{% endif %}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+                <button class="swap-btn" onclick="swapLangs()">⇄</button>
+                <select id="targetLang" class="lang-select">
+                    {% for code, (name, speech, tts) in languages.items() %}
+                    <option value="{{ code }}" {% if code == 'en' %}selected{% endif %}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="translator-box">
+                <div class="panel">
+                    <div class="panel-label" id="srcLabel">O'zbekcha</div>
+                    <textarea id="srcText" class="text-input" placeholder="Matn kiriting..."></textarea>
+                </div>
+                <div class="panel">
+                    <div class="panel-label" id="tgtLabel">Inglizcha</div>
+                    <div id="tgtResult" class="result-text empty">Tarjima shu yerda...</div>
+                </div>
+            </div>
+            <div class="actions">
+                <button class="btn btn-primary" onclick="doTranslate()">🌐 Tarjima</button>
+                <button class="btn btn-secondary" id="listenBtn" onclick="playAudio(lastTr,targetLang.value)" style="display:none">🔊</button>
+            </div>
+            <div id="trStatus" class="status"></div>
+        </div>
+
+        <div id="etab-movies" class="etab-content">
+            <div class="search-bar">
+                <input type="text" id="movieInput" class="search-input" placeholder="Kino nomi (inglizcha)..."
+                    onkeydown="if(event.key==='Enter')searchMovie()">
+                <button class="btn btn-movie" onclick="searchMovie()">🔍</button>
+            </div>
+            <div id="movieResult" class="movie-result">
+                <div class="movie-title" id="movieTitle"></div>
+                <div class="movie-summary" id="movieSummary"></div>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <button class="btn btn-secondary" onclick="playAudio(curMovie,'uz')">🔊 Eshitish</button>
+                    <a id="movieLink" class="movie-link" href="#" target="_blank">📖 Wikipedia</a>
+                </div>
+            </div>
+            <div id="movieStatus" class="status"></div>
+            <div class="popular-title">🏆 Mashhur kinolar</div>
+            <div class="popular-grid" id="popularGrid"></div>
+        </div>
+    </div>
+
+    <div class="footer">Martis AI Agent — "Martis" deb chaqiring</div>
+</div>
+
+<script>
+const WAKE = 'martis';
+let state = 'idle'; // idle, waiting, heard, listening, thinking, speaking
+let wakeRec = null;
+let wakeCooldown = false; // takrorlanishni oldini olish
+
+const orb = document.getElementById('martisOrb');
+const statusText = document.getElementById('martisStatusText');
+const subText = document.getElementById('martisSubText');
+const chatLog = document.getElementById('chatLog');
+
+// === STATE MACHINE ===
+function setState(newState, msg, sub) {
+    state = newState;
+    orb.className = 'martis-orb ' + newState;
+    statusText.className = 'martis-status ' + newState;
+    if (msg) statusText.textContent = msg;
+    if (sub !== undefined) subText.textContent = sub;
+
+    const emojis = { idle:'🤖', waiting:'👂', heard:'✨', listening:'🎤', thinking:'🧠', speaking:'🔊' };
+    orb.textContent = emojis[newState] || '🤖';
+}
+
+// === ACTIVATE MARTIS ===
+function activateMartis() {
+    if (state === 'waiting') {
+        stopWake();
+        setState('idle', 'Bosing va "Martis" deb ayting', '');
+        return;
+    }
+    startWake();
+}
+
+function startWake() {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        alert('Chrome brauzer kerak!'); return;
+    }
+
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    wakeRec = new SR();
+    wakeRec.lang = 'en-US';  // Inglizcha tinlaydi — "Martis" ni yaxshi tushunadi
+    wakeRec.continuous = true;
+    wakeRec.interimResults = true;
+
+    wakeRec.onresult = (e) => {
+        if (wakeCooldown) return; // takrorlanishni oldini olish
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+            // Faqat yakuniy natijani tekshirish (interim emas)
+            if (!e.results[i].isFinal) continue;
+            const t = e.results[i][0].transcript.toLowerCase();
+            subText.textContent = '🔍 "' + t + '"';
+            if (t.includes('martis') || t.includes('marcus') || t.includes('martin') ||
+                t.includes('mars') || t.includes('marty') || t.includes('marte') ||
+                t.includes('мартис') || t.includes('mar tis') || t.includes('mark')) {
+                wakeCooldown = true;
+                stopWake();
+                onWakeWordDetected();
+                return;
+            }
+        }
+    };
+
+    wakeRec.onend = () => {
+        if (state === 'waiting') {
+            // Qayta boshlash — doimiy tinlash
+            setTimeout(() => {
+                try { if (state === 'waiting') wakeRec.start(); } catch(e) {}
+            }, 100);
+        }
+    };
+
+    wakeRec.onerror = (e) => {
+        console.log('Wake error:', e.error);
+        if (e.error === 'not-allowed') {
+            setState('idle', '❌ Mikrofon ruxsati berilmagan!', 'Brauzerda mikrofon ruxsatini bering');
+            return;
+        }
+    };
+
+    setState('waiting', '"Martis" deb ayting...', 'Quloq tutib turibman');
+    wakeRec.start();
+}
+
+function stopWake() {
+    if (wakeRec) { try { wakeRec.stop(); } catch(e) {} wakeRec = null; }
+}
+
+// === MARTIS HEARD ===
+async function onWakeWordDetected() {
+    setState('heard', 'Martis eshitildi!', '');
+    addLog('🟢 "Martis" chaqirildi', 'system');
+
+    // "Labbay" deb javob berish
+    setState('speaking', 'Labbay!', '');
+    await speakAndWait('Labbay, tinglayapman!', 'uz');
+
+    // Endi haqiqiy buyruqni tinglash
+    listenForCommand();
+}
+
+// === LISTEN FOR COMMAND ===
+function listenForCommand() {
+    setState('listening', 'Tinglayapman... gapiring', '');
+
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const rec = new SR();
+    rec.lang = 'uz-UZ';
+    rec.continuous = true;       // Doimiy tinlash
+    rec.interimResults = true;   // Oraliq natijalarni ko'rsatish
+
+    let finalText = '';
+    let silenceTimer = null;
+
+    rec.onresult = (e) => {
+        let interim = '';
+        finalText = '';
+
+        for (let i = 0; i < e.results.length; i++) {
+            const t = e.results[i][0].transcript;
+            if (e.results[i].isFinal) {
+                finalText += t + ' ';
+            } else {
+                interim += t;
+            }
+        }
+
+        // Oraliq matnni ko'rsatish
+        const display = (finalText + interim).trim();
+        if (display) subText.textContent = '🗣 "' + display + '"';
+
+        // Inson to'xtaganda 1.5 soniyadan keyin yuborish
+        clearTimeout(silenceTimer);
+        silenceTimer = setTimeout(() => {
+            const clean = finalText.trim()
+                .replace(/martis/gi, '').replace(/мартис/gi, '')
+                .replace(/martin/gi, '').replace(/marcus/gi, '').trim();
+            if (clean) {
+                rec.stop();
+                processCommand(clean);
+            }
+        }, 1500);
+    };
+
+    rec.onerror = () => {
+        clearTimeout(silenceTimer);
+        addLog('Ovoz aniqlanmadi', 'system');
+        backToWake();
+    };
+
+    rec.onend = () => {
+        clearTimeout(silenceTimer);
+        if (state === 'listening') {
+            // Yakuniy matnni tekshirish
+            const clean = finalText.trim()
+                .replace(/martis/gi, '').replace(/мартис/gi, '')
+                .replace(/martin/gi, '').replace(/marcus/gi, '').trim();
+            if (clean) {
+                processCommand(clean);
+            } else {
+                backToWake();
+            }
+        }
+    };
+
+    rec.start();
+}
+
+function backToWake() {
+    setState('waiting', '"Martis" deb ayting...', '');
+    wakeCooldown = false;
+    startWake();
+}
+
+// === PROCESS COMMAND ===
+async function processCommand(text) {
+    setState('thinking', 'Martis o\'ylamoqda...', '"' + text + '"');
+    addLog(text, 'user');
+
+    try {
+        const res = await fetch('/chat', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({message: text})
+        });
+        const data = await res.json();
+        const answer = data.response || data.error || 'Xatolik';
+
+        addLog(answer, 'bot');
+
+        // Ovozda aytish
+        setState('speaking', 'Martis gapirmoqda...', '');
+        await speakAndWait(answer, 'uz');
+
+    } catch(e) {
+        addLog('Xatolik: ' + e.message, 'system');
+    }
+
+    // Qayta tinglashga qaytish
+    backToWake();
+}
+
+// === SPEAK AND WAIT ===
+function speakAndWait(text, lang) {
+    return new Promise(async (resolve) => {
+        try {
+            const res = await fetch('/speak', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({text, lang})
+            });
+            const blob = await res.blob();
+            const audio = new Audio(URL.createObjectURL(blob));
+            audio.onended = resolve;
+            audio.onerror = resolve;
+            audio.play();
+        } catch(e) { resolve(); }
+    });
+}
+
+// === CHAT LOG ===
+function addLog(text, type) {
+    const div = document.createElement('div');
+    div.className = 'log-item ' + type;
+    if (type === 'bot') {
+        const escaped = text.replace(/'/g, "\\'").replace(/\n/g, ' ');
+        div.innerHTML = '🤖 ' + text + ` <button class="replay-btn" onclick="playAudio('${escaped}','uz')">🔊</button>`;
+    } else if (type === 'user') {
+        div.textContent = '🗣 ' + text;
+    } else {
+        div.textContent = text;
+    }
+    chatLog.appendChild(div);
+    chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+// === MANUAL INPUT ===
+async function manualSend() {
+    const input = document.getElementById('manualInput');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+
+    addLog(text, 'user');
+    setState('thinking', 'Martis o\'ylamoqda...', '');
+
+    try {
+        const res = await fetch('/chat', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({message: text})
+        });
+        const data = await res.json();
+        const answer = data.response || data.error;
+        addLog(answer, 'bot');
+        setState('speaking', 'Martis gapirmoqda...', '');
+        await speakAndWait(answer, 'uz');
+    } catch(e) { addLog('Xatolik: ' + e.message, 'system'); }
+
+    if (state !== 'waiting') setState('idle', 'Bosing va "Martis" deb ayting', '');
+}
+
+async function resetChat() {
+    await fetch('/chat/reset', {method:'POST'});
+    chatLog.innerHTML = '<div class="log-item system">Yangi suhbat. "Martis" deb chaqiring!</div>';
+}
+
+// === AUDIO HELPER ===
+async function playAudio(text, lang) {
+    const res = await fetch('/speak', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({text, lang})
+    });
+    const blob = await res.blob();
+    new Audio(URL.createObjectURL(blob)).play();
+}
+
+// === EXTRA TABS ===
+function switchExtraTab(tab, btn) {
+    document.querySelectorAll('.etab-content').forEach(e => e.classList.remove('active'));
+    document.querySelectorAll('.etab-btn').forEach(e => e.classList.remove('active'));
+    document.getElementById('etab-' + tab).classList.add('active');
+    btn.classList.add('active');
+    if (tab === 'movies') loadPopularMovies();
+}
+
+// === TARJIMON ===
+const sourceLang = document.getElementById('sourceLang');
+const targetLang = document.getElementById('targetLang');
+let lastTr = '';
+
+sourceLang.onchange = () => document.getElementById('srcLabel').textContent = sourceLang.options[sourceLang.selectedIndex].text;
+targetLang.onchange = () => document.getElementById('tgtLabel').textContent = targetLang.options[targetLang.selectedIndex].text;
+
+function swapLangs() {
+    [sourceLang.value, targetLang.value] = [targetLang.value, sourceLang.value];
+    sourceLang.onchange(); targetLang.onchange();
+}
+
+async function doTranslate() {
+    const text = document.getElementById('srcText').value.trim();
+    if (!text) return;
+    showSt('trStatus','🧠 Tarjima...','loading');
+    try {
+        const res = await fetch('/translate', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({text, source:sourceLang.value, target:targetLang.value})
+        });
+        const data = await res.json();
+        lastTr = data.translation;
+        document.getElementById('tgtResult').textContent = data.translation;
+        document.getElementById('tgtResult').classList.remove('empty');
+        document.getElementById('listenBtn').style.display = 'inline-flex';
+        showSt('trStatus','✅ Tayyor!','success');
+        playAudio(data.translation, targetLang.value);
+    } catch(e) { showSt('trStatus','❌ '+e.message,'error'); }
+}
+
+document.getElementById('srcText').onkeydown = (e) => { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();doTranslate();} };
+
+// === KINO ===
+let curMovie = '';
+
+async function searchMovie() {
+    const name = document.getElementById('movieInput').value.trim();
+    if (!name) return;
+    showSt('movieStatus','🔍 Qidirilmoqda...','loading');
+    document.getElementById('movieResult').classList.remove('show');
+    try {
+        const res = await fetch('/movie/search', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({name})
+        });
+        const data = await res.json();
+        document.getElementById('movieTitle').textContent = '🎬 ' + data.title;
+        document.getElementById('movieSummary').textContent = data.summary_uz;
+        document.getElementById('movieLink').href = data.url || '#';
+        curMovie = data.summary_uz;
+        document.getElementById('movieResult').classList.add('show');
+        showSt('movieStatus', data.found?'✅':'⚠️ Topilmadi', data.found?'success':'error');
+    } catch(e) { showSt('movieStatus','❌ '+e.message,'error'); }
+}
+
+async function loadPopularMovies() {
+    const g = document.getElementById('popularGrid');
+    if (g.children.length > 0) return;
+    const em = ['🎬','🎥','🎞️','🎭','🎪','🎯','🌟','⭐','🏆','🎖️'];
+    try {
+        const movies = await (await fetch('/movie/popular')).json();
+        movies.forEach((m,i) => {
+            const c = document.createElement('div'); c.className = 'popular-card';
+            c.onclick = () => { document.getElementById('movieInput').value = m.name; searchMovie(); };
+            c.innerHTML = `<div class="emoji">${em[i]}</div><div class="name">${m.name}</div><div class="uz-name">${m.uz_name}</div>`;
+            g.appendChild(c);
+        });
+    } catch(e) {}
+}
+
+function showSt(id,msg,type) {
+    const el = document.getElementById(id);
+    el.textContent = msg; el.className = 'status show ' + type;
+    if (type === 'success') setTimeout(() => el.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
